@@ -1,0 +1,237 @@
+Answer the following questions?
+How many Power BI reports are currently hosted in our system?
+How many unique Power BI developers are publishing reports to our system?
+How many data refresh schedules are currently set up for Power BI reports?
+Are there data refreshes that are being executed too frequently?
+Are there data refreshes that are consistently running too long?
+Are there data refreshes that are continually failing?
+
+
+
+
+
+
+Install Requirements
+Invoke-Expression (Invoke-WebRequest https://aka.ms/rstools)
+
+
+
+
+
+Export All Power BI Report Data
+#Set Global Variables
+$ReportServerURL = "LINK GOES HERE";
+$ReportFolder = "/";
+$PBIReports = @();
+$FormattedInventory = @();
+$ExportCSVFile = "D:\ExportedFiles\PBIRS_Reports.csv";
+ 
+$PBIReports = Get-RsFolderContent -ReportServerUri $ReportServerURL -RsFolder $ReportFolder -Recurse | Where-Object {$_.TypeName -eq "PowerBIReport"}
+ 
+foreach($report in $PBIReports)
+{
+    #Friendly formatting
+    $fullURL = $ReportServerURL + "/powerbi" + $report.Path;
+    $created = $report.CreationDate.ToShortDateString() + " " + $report.CreationDate.ToShortTimeString();
+    $modified = $report.ModifiedDate.ToShortDateString() + " " + $report.ModifiedDate.ToShortTimeString();
+    $hidden = "N";
+    $description = $null;
+ 
+    $newPBIReport = New-Object –TypeName PSObject;
+    $newPBIReport | Add-Member –MemberType NoteProperty –Name ReportID –Value $report.ID;
+    $newPBIReport | Add-Member –MemberType NoteProperty –Name ReportURL –Value $fullURL;
+    $newPBIReport | Add-Member –MemberType NoteProperty –Name ReportName –Value $report.Name;
+    $newPBIReport | Add-Member –MemberType NoteProperty –Name ReportDescription –Value $report.Description;
+    $newPBIReport | Add-Member –MemberType NoteProperty –Name ReportHidden –Value $report.Hidden;
+    $newPBIReport | Add-Member –MemberType NoteProperty –Name CreatedBy –Value $report.CreatedBy;
+    $newPBIReport | Add-Member –MemberType NoteProperty –Name Created –Value $created;
+    $newPBIReport | Add-Member –MemberType NoteProperty –Name ModifiedBy –Value $report.ModifiedBy;
+    $newPBIReport | Add-Member –MemberType NoteProperty –Name Modified –Value $modified;
+ 
+    $FormattedInventory += $newPBIReport;
+}
+ 
+$FormattedInventory | Export-Csv -LiteralPath $ExportCSVFile -NoTypeInformation
+
+
+
+
+
+
+
+
+
+
+
+Export All Power BI Data Refresh Plan Data
+#Set Global Variables
+$ReportServerURL = "LINK GOES HERE";
+$ReportFolder = "/";
+$ReportRefreshPlans = @();
+$ExportCSVFile = "D:\ExportedFiles\PBIRS_RefreshPlans.csv";
+ 
+$PBIReports = Get-RsFolderContent -ReportServerUri $ReportServerURL -RsFolder $ReportFolder -Recurse | Where-Object {$_.TypeName -eq "PowerBIReport"}
+ 
+foreach($report in $PBIReports)
+{
+    Try
+    {
+        #Get refresh plan for power bi reports
+        $refreshPlans = Get-RsRestCacheRefreshPlan -ReportPortalUri $ReportServerURL -RsReport $report.Path;
+    
+        if($refreshPlans -ne $null)
+        {
+            foreach($refreshPlan in $refreshPlans)
+            {
+                #Format friendly output
+                $start = [datetime]$refreshPlan.Schedule.Definition.StartDateTime
+                $startTime = $start.ToShortDateString() + " " + $start.ToShortTimeString();
+                $end = [datetime]$refreshPlan.Schedule.Definition.EndDate
+                $endTime = $end.ToShortDateString() + " " + $end.ToShortTimeString();
+                $modified = [datetime]$refreshPlan.ModifiedDate
+                $modifiedTime = $modified.ToShortDateString() + " " + $modified.ToShortTimeString();
+                $lastRun = [datetime]$refreshPlan.LastRunTime
+                $lastRunTime = $lastRun.ToShortDateString() + " " + $lastRun.ToShortTimeString();
+ 
+                $intervalType = "";
+                $interval = 0;
+                
+                #Determine refresh interval and interval type
+                if($refreshPlan.Schedule.Definition.Recurrence.MinuteRecurrence -ne $null)
+                {
+                    $intervalType = "Minutes";
+                    $interval = $refreshPlan.Schedule.Definition.Recurrence.MinuteRecurrence.MinutesInterval;
+                }
+                elseif($refreshPlan.Schedule.Definition.Recurrence.DailyRecurrence -ne $null)
+                {
+                    $intervalType = "Daily";
+                    $interval = $refreshPlan.Schedule.Definition.Recurrence.DailyRecurrence.DaysInterval;
+                }
+                elseif($refreshPlan.Schedule.Definition.Recurrence.WeeklyRecurrence -ne $null)
+                {
+                    $intervalType = "Weekly";
+                    $interval = $refreshPlan.Schedule.Definition.Recurrence.WeeklyRecurrence.WeeksInterval;
+                }
+                elseif($refreshPlan.Schedule.Definition.Recurrence.MonthlyRecurrence -ne $null)
+                {
+                    $intervalType = "Monthly";
+                    $interval = $refreshPlan.Schedule.Definition.Recurrence.MonthlyRecurrence.Day;
+                }
+                elseif($refreshPlan.Schedule.Definition.Recurrence.MonthlyDOWRecurrence -ne $null)
+                {
+                    $intervalType = "Monthly DOW";
+                    $interval = $refreshPlan.Schedule.Definition.Recurrence.MonthlyDOWRecurrence.MonthFreq;
+                }
+                else
+                {
+                    $intervalType = "Once";
+                    $interval = 0;
+                }
+ 
+                $newRPItem = New-Object –TypeName PSObject;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name ReportID –Value $report.ID;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name DataRefreshPlanID –Value $refreshPlan.Id;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name Owner –Value $refreshPlan.Owner;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name ScheduleDescription –Value $refreshPlan.ScheduleDescription;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name ModifiedBy –Value $refreshPlan.ModifiedBy;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name ModifiedDate –Value $modifiedTime;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name LastStatus –Value $refreshPlan.LastStatus;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name LastRunTime –Value $lastRunTime;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name RecurrenceType –Value $intervalType;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name RecurrenceInterval –Value $interval;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name StartDateTime –Value $startTime;
+                $newRPItem | Add-Member –MemberType NoteProperty –Name EndDateTime –Value $endTime;
+ 
+                $ReportRefreshPlans += $newRPItem;
+            }           
+        }
+    }
+    Catch
+    {
+    }
+}
+$ReportRefreshPlans | Export-Csv -LiteralPath $ExportCSVFile -NoTypeInformation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Export All Power BI Data Refresh Plan History 
+#Set Global Variables
+$ReportServerURL = "LINK GOES HERE";
+$ReportFolder = "/";
+$ReportRefresh = @();
+$ExportCSVFile = "D:\ExportedFiles\PBIRS_RefreshHistory.csv";
+ 
+$PBIReports = Get-RsFolderContent -ReportServerUri $ReportServerURL -RsFolder $ReportFolder -Recurse | Where-Object {$_.TypeName -eq "PowerBIReport"}
+ 
+foreach($report in $PBIReports)
+{
+    Try
+    {
+        #Get refresh history for Power BI report
+        $refreshHistory = Get-RsRestCacheRefreshPlanHistory -ReportPortalUri $ReportServerURL -RsReport $report.Path
+ 
+        if($refreshHistory.Count -gt 0)
+        {               
+ 
+            foreach($rh in $refreshHistory)
+            {
+                $start = [datetime]$rh.StartTime
+                $startTime = $start.ToShortDateString() + " " + $start.ToShortTimeString();
+                $end = [datetime]$rh.EndTime
+                $endTime = $end.ToShortDateString() + " " + $end.ToShortTimeString();
+ 
+                $detailsLength = 0;
+ 
+                #Only get the first 1000 characters of the error message
+                if($rh.Details.Length -gt 1000)
+                {
+                    $detailsLength = 1000;
+                }
+                else
+                {
+                    $detailsLength = $rh.Details.Length;
+                }
+ 
+                $Duration = $end - $start;                
+                
+                $newRHItem = New-Object –TypeName PSObject;
+                $newRHItem | Add-Member –MemberType NoteProperty –Name ReportID –Value $report.ID;
+                $newRHItem | Add-Member –MemberType NoteProperty –Name Status –Value $rh.Status;
+                $newRHItem | Add-Member –MemberType NoteProperty –Name Type –Value $rh.Type;
+                $newRHItem | Add-Member –MemberType NoteProperty –Name DataRefreshPlanID –Value $rh.SubscriptionID;
+                $newRHItem | Add-Member –MemberType NoteProperty –Name StartDate –Value $startTime;
+                $newRHItem | Add-Member –MemberType NoteProperty –Name EndDate –Value $endTime;
+                $newRHItem | Add-Member –MemberType NoteProperty –Name TotalMinutesTaken –Value $Duration.TotalMinutes;
+                $newRHItem | Add-Member –MemberType NoteProperty –Name Message –Value $rh.Message;
+                $newRHItem | Add-Member –MemberType NoteProperty –Name Details –Value $rh.Details.Substring(0,$detailsLength);
+ 
+                $ReportRefresh += $newRHItem;
+            }
+        }
+    }
+    Catch
+    {
+    }
+}
+ 
+$ReportRefresh | Export-Csv -LiteralPath $ExportCSVFile -NoTypeInformation
+
+
+
+
+

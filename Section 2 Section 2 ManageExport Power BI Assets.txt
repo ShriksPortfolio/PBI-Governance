@@ -1,0 +1,100 @@
+Section 2: Manage/Export Power BI Assets 	Workspaces, Datasets, Reports, Dataflows,Datasources
+
+
+Run Scrips from ISE	
+Install-Module MicrosoftPowerBIMgmt
+**Install-Module MicrosoftPowerBIMgmt -Force**
+
+	
+        
+	
+02	Login-PowerBI
+Login into Power BI	
+	
+
+
+
+03.Collect,Export all workspaces	Get-PowerBIWorkspace -Scope Organization -All |
+Export-Excel -Path C:\temp\PBIServiceAssets.xlsx -WorksheetName Workspace
+First, collect info about all the Workspaces, across your entire tenant.	
+NOTE: You must be a Power BI Admin in order to successfully execute the code below. 
+If you are not a Power BI Admin, remove the -Scope Organization portion of the code below, as well as all subsequent commands.
+
+
+04. Collect, export all datasets	foreach ($Workspace in Get-PowerBIWorkspace -Scope Organization -All) 
+Collect all of the Datasets across the tenant and append the WorkspaceID they belong to.	{
+	    $Dataset = Get-PowerBIDataset -WorkspaceId $Workspace.Id -Scope Organization 
+	    Export-Excel -Path c:\temp\PBIServiceAssets.xlsx -WorksheetName DatasetsIn_Workspaces -Append
+	}
+	
+	
+05 Collect, Export all reports	foreach ($Workspace in Get-PowerBIWorkspace -Scope Organization -All ) 
+Collect all of the Reports across the tenant and append the WorkspaceID they belong to.	{
+	    $Dataset = Get-PowerBIReport -WorkspaceId ($Workspace.Id) -Scope Organization
+	    $Dataset | Add-Member -NotePropertyName WorkspaceId -NotePropertyValue $Workspace.Id;
+	    $Dataset | 
+	    Export-Excel -Path c:\temp\PBIServiceAssets.xlsx -WorksheetName ReportsIn_Workspaces -Append
+	}
+	
+	
+06 Collect, Export all dataflows	foreach ($Workspace in Get-PowerBIWorkspace -Scope Organization -All | WHERE { $_.Type -eq 'Workspace'}) 
+Collect all of the dataflows across the tenant and append the WorkspaceID they belong to.	{
+	    $Dataflow = Get-PowerBIDataflow -WorkspaceId $Workspace.Id -Scope Organization 
+	    $Dataflow | Add-Member -NotePropertyName WorkspaceId -NotePropertyValue $Workspace.Id;
+	    $Dataflow | 
+	    Export-Excel -Path c:\temp\PBIServiceAssets.xlsx -WorksheetName dataflows -Append
+	}
+	
+	
+07 Collect, Export all datasources	foreach ($Workspace in Get-PowerBIWorkspace -Scope Organization | WHERE { $_.Type -eq 'Workspace'} ) 
+Collect all the Datasources of the dataflows across the tenant and append the WorkspaceID they belong to. NOTE: There used to be a bug in the API that causes this step to time out on dataflows which have never been 'refreshed'. I think it has been fixed, but please let me know if you're still running into it?	{
+	    $DataflowDatasource = Get-PowerBIDataflow -WorkspaceId $Workspace.Id -Scope Organization | 
+	    Get-PowerBIDataflowDatasource -WorkspaceId $Workspace.Id -Scope Organization
+	    $DataflowDatasource | Add-Member -NotePropertyName WorkspaceId -NotePropertyValue $Workspace.Id;
+	    $DataflowDatasource | 
+	    Export-Excel -Path c:\temp\PBIServiceAssets.xlsx -WorksheetName dataflowDatasources -Append
+	}
+	        
+08.Workspaces which have been deleted	Get-PowerBIWorkspace -Scope Organization -All -Orphaned
+	
+09.My Workspace' of user accounts which have been deleted / removed	Get-PowerBIWorkspace -Scope Organization -All |
+	WHERE { $_.Name -eq 'PersonalWorkspace Of Anonymized User' }
+	        
+10.Workspaces which have been deleted	Get-PowerBIWorkspace -Scope Organization -Deleted -All
+	
+11.Export all workspaces which have been deleted	Get-PowerBIWorkspace -Scope Organization -Deleted -All |
+Export results to Excel (requires the ImportExcel module from PowerShell Gallery	Export-Excel -Path c:\temp\Orphaned_Workspaces.xlsx -WorksheetName DeletedWorkspaces
+
+
+12.Export all workspaces and datasets which have been deleted	Get-PowerBIWorkspace -Scope Organization -Deleted -All |
+Export results to Excel (requires the ImportExcel module from PowerShell Gallery	Get-PowerBIDataset -Scope Organization |
+	Export-Excel -Path c:\temp\Orphaned_Workspaces.xlsx -WorksheetName DatasetsIn_DeletedWorkspaces
+	        
+	
+13.Export all Datasets within Workspaces which have been Orphaned	Get-PowerBIWorkspace -Scope Organization -All -Orphaned |
+	Export-Excel -Path c:\temp\Orphaned_Workspaces.xlsx -WorksheetName Workspaces
+	
+	
+14.Export all Datasets within Workspaces which have been deleted	Get-PowerBIWorkspace -Scope Organization -All -Orphaned |
+	Get-PowerBIDataset -Scope Organization |
+	Export-Excel -Path c:\temp\Orphaned_Workspaces.xlsx -WorksheetName DatasetsIn_Workspaces
+15. My Workspace' of user accounts which have been deleted / removed	Get-PowerBIWorkspace -Scope Organization -All |
+	WHERE { $_.Name -eq 'PersonalWorkspace Of Anonymized User' } |
+	SELECT -Property $_.Id, $_.Name, $_.IsReadOnly, $_.IsOnDedicatedCapacity, $_.CapacityId, $_.Description, $_.Type, $_.State, $_.IsOrphaned, $_.Users
+	
+	Export-Excel -Path c:\temp\Orphaned_Workspaces.xlsx -WorksheetName MyWorkspaces
+	        
+16.Datasets in those 'My Workspace	Get-PowerBIWorkspace -Scope Organization -All |
+	WHERE { $_.Name -eq 'PersonalWorkspace Of Anonymized User' } |
+	Get-PowerBIDataset -Scope Organization |
+	Export-Excel -Path c:\temp\Orphaned_Workspaces.xlsx -WorksheetName DatasetsIn_MyWorkspaces -Show
+	        
+17. Restore Workspace	Get-PowerBIWorkspace -Scope Organization -Deleted -All
+To view deleted workspaces as a tenant administrator:
+18.Restores a deleted workspace	Restore-PowerBIWorkspace -Id "3244f1c1-01cf-457f-9383-6035e4950fdc" -RestoredName "TestWorkspace" -AdminEmailAddress "john@contoso.com"
+	
+19.	**To correct this, so we have no orphaned workspaces we can**
+<# Recover orphaned workspaces	Get-PowerBIWorkspace -Scope Organization -Orphaned -All
+A workspace becomes orphaned when it has no assigned administrators. If you are a tenant administrator, run the following to view all orphaned workspaces: #>	
+	Add-PowerBIWorkspaceUser -Scope Organization -Id f2a0fae5-1c37-4ee6-97da-c9d31851fe17 -UserPrincipalName 'john@contoso.com' -AccessRight Admin
+	

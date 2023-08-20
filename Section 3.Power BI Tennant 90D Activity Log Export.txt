@@ -1,0 +1,142 @@
+Section 3: Get Power BI Activity Logs	
+01	Login-PowerBI
+Login to Power BI	
+	
+02.Get Power BI Activity	Get-PowerBIActivityEvent -StartDateTime (Get-Date ((Get-Date).Date) -Format yyyy-MM-ddTHH:mm:ss) -EndDateTime (Get-Date -Format yyyy-
+The example below will retrieve the current day's audit log events. Please not the specific date-formatting required to use the cmdlet.
+
+
+03. Export the last 90 days into a JSON file	90..1 |
+Retrieve the past 90 days worth of Power BI audit log events and save each day's events to it's own .json file.	foreach {
+	    $Date = (((Get-Date).Date).AddDays(-$_))
+	    $StartDate = (Get-Date -Date ($Date) -Format yyyy-MM-ddTHH:mm:ss)
+	    $EndDate = (Get-Date -Date ((($Date).AddDays(1)).AddMilliseconds(-1)) -Format yyyy-MM-ddTHH:mm:ss)
+	    
+	    Get-PowerBIActivityEvent -StartDateTime $StartDate -EndDateTime $EndDate -ResultType JsonString | 
+	    Out-File -FilePath "c:\temp\PowerBIAuditLogs\PowerBI_AudititLog_$(Get-Date -Date $Date -Format yyyyMMdd).json"
+	}
+	
+	        
+04.Export the last 90 days activity logs into a excel file	$UserCredential = Get-Credential 'your.email@somewhere.com'
+Export the PowerBI events from the O365 Audit Log into separate .CSV files for each of the last 90 days. See this Docs file for more information on this feature.	
+	90..1 |
+	foreach {
+	
+	$Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection
+	Import-PSSession $Session
+	
+	$Start=((Get-Date).Date).AddDays(-$_);            
+	Search-UnifiedAuditLog -StartDate $Start -EndDate $Start.AddDays(1) -RecordType PowerBI -ResultSize 5000 |
+	Export-Csv -Path "c:\temp\PowerBIAuditLogs\PowerBIAudit_Log_$(Get-Date -Date $Start.AddDays(1) -Format yyyyMMdd).csv" -NoTypeInformation
+	
+	Remove-PSSession $Session
+	        
+	}
+05.	**Add the following code to provide a starting point for Exercise08.ps1**
+Write a Script that Exports Power BI Activity Events	Clear-Host Write-Host Connect-PowerBIServiceAccount | Out-Null
+	
+	
+	**add the following code to create a PowerShell function named ExportDailyActivity**
+	function ExportDailyActivity($date) {
+	 $start = (Get-Date -Date ($date) -Format yyyy-MM-ddTHH:mm:ss)
+	 $end = (Get-Date -Date ((($date).AddDays(1)).AddSeconds(-1)) -Format yyyy-MM-ddTHH:mm:ss)
+	
+	
+	 New-Item -ItemType Directory -Force -Path "$PSScriptRoot/logs" | Out-Null
+	 $dateString = (Get-Date -Date ($date) -Format yyyy-MM-dd)
+	 $outputFile = "$PSScriptRoot/logs/ActivityEventsLog-$dateString.csv"
+	
+	 Write-Host "Getting actvities for $dateString"
+	 $events = Get-PowerBIActivityEvent -StartDateTime $start -EndDateTime $end `
+	 -ResultType JsonString | ConvertFrom-Json
+	
+	 if($events){
+	 Write-Host " - Exporting events to $outputFile"
+	 $events | Export-Csv -Path $outputFile -NoTypeInformation
+	 }
+	 else {
+	 Write-Host " - There was no activity on $dateString"
+	 }
+	} 
+	
+	
+	**below the ExportDailyActivity function and add the following code**
+	$DaysBack = 3
+	$DateRange = $DaysBack..0
+	
+	foreach($dayOffset in $DateRange) {
+	 $day = (((Get-Date).Date).AddDays(-$dayOffset))
+	 ExportDailyActivity $day
+	} 
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	        
+	
+	
+	
+	
+Use PowerShell to download all your Power BI reports from a workspace	<#
+	 This script downloads all Power BI Reports in a workspace.
+https://shabnamwatson.wpcomstaging.com/2020/10/12/use-powershell-to-download-all-your-power-bi-reports-from-a-workspace/	 It adds today's date to the beginning of the file name to make it 
+	 easier to take daily backups.
+	 2020-10-12
+	 ABI Cube corp.
+	>#
+	
+	
+	<#
+	  This script requires the MicrosoftPowerBIMgmt module.
+	  Run the following command to install it if not already installed: 
+	  Install-Module -Name MicrosoftPowerBIMgmt 
+	#>
+	
+	<#If the login step to PBI fails, try running the following line first.
+	 [Net.ServicePointManager]:SecurityProtocol = [Net.SecurityProtocolType]::Tsl12
+	#>
+	
+	#Log in to Power BI Service
+	Login-PowerBI  -Environment Public
+	
+	$PBIWorkspace = Get-PowerBIWorkspace -Name 'My Workspace Name'
+	
+	$PBIReports = Get-PowerBIReport -WorkspaceId $PBIWorkspace.Id # -Name "My Report Name" #Use the Name parameter to limit to one report.
+	
+	$TodaysDate = Get-Date -Format "MM_dd_yyyy_"
+	
+	$OutPutPath = "C:\PowerBIReportsBackup\" + $TodaysDate 
+	
+	#Loop through the reports:
+	ForEach($Report in $PBIReports)
+	{
+	 Write-Host "Downloading " $Report.name 
+	 $OutputFile = $OutPutPath +  $Report.name + ".pbix"
+	
+	 # If the file exists, delete it first; otherwise, the Export-PowerBIReport will fail.
+	 if (Test-Path $OutputFile)
+	 {
+	     Remove-Item $OutputFile
+	 }
+	
+	 Export-PowerBIReport -WorkspaceId $PBIWorkspace.ID -Id $Report.ID -OutFile $OutputFile
+	
+	}

@@ -1,0 +1,53 @@
+Section 1: Getting Started With Power BI cmdlets
+
+Run Scrips from ISE	
+Install-Module MicrosoftPowerBIMgmt		
+01.	Install-Module MicrosoftPowerBIMgmt -Force
+
+
+02.	Import-Module MicrosoftPowerBIMgmt
+Import-Module MicrosoftPowerBIMgmt	
+
+
+03.	Update-Module MicrosoftPowerBIMgmt* -WhatIf
+Update Power BI Cmdlets	
+
+
+04.	Get-Command -Module MicrosoftPowerBIMgmt*
+See all the available Cmdlets	
+
+
+05.	Login-PowerBI
+Log into Power BI	
+
+
+06.	Get-PowerBIWorkspace
+Get all Power BI Workspaces	
+	
+
+07.	Get-PowerBIWorkspace | Format-Table -AutoSize -Property Name
+Get all Power BI Workspaces	
+	
+
+08.	Get-PowerBIWorkspace | Format-Table -AutoSize -Property Name
+Get-PowerBIWorkspace | Format-Table -AutoSize -Property Name	
+	
+
+09.	Get-PowerBIWorkspace -Name 'QA' | Get-PowerBIReport | ft -AutoSize -Property Name
+Get all reports from a specific worksapce	
+	
+
+
+10.	Get-PowerBIWorkspace -Name 'QA' | Get-PowerBIDataset | ft -AutoSize
+Gel power bi datasets from a specific worksapce
+
+
+
+11.	Get-PowerBIWorkspace -Name 'QA' | Get-PowerBIDataflow | ft -AutoSize
+Get all Power BI Dataflows from a specific workspace	
+
+
+	
+12.	Get-Command -Module MicrosoftPowerBIMgmt* -Noun PowerBIReport*
+Get all actions that can be made for Power BI Reports only
+
